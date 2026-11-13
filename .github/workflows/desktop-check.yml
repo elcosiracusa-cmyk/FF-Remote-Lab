@@ -1,0 +1,20 @@
+name: Validate FF Remote Lab Desktop
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax checks for Python console and auto-screen monitor
+        run: |
+          python3 -m py_compile kali/ffremote-desktop.py kali/ffremote-autoscreen.py
+      - name: Validate Android version and explicit visible session controls
+        run: |
+          grep -q 'ABILITA SESSIONE CONTINUA' app/src/main/java/it/fflab/remote/MainActivity.java
+          grep -q 'REVOCA SUBITO' app/src/main/java/it/fflab/remote/MainActivity.java
+          grep -q 'INTERROMPI' app/src/main/java/it/fflab/remote/RemoteSessionService.java
