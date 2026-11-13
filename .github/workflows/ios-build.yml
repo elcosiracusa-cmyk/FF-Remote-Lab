@@ -1,0 +1,28 @@
+name: iOS ReplayKit Simulator Build
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ios/**'
+      - '.github/workflows/ios-build.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        run: |
+          cd ios
+          xcodegen generate
+      - name: Compile for iOS simulator without signing
+        run: |
+          cd ios
+          xcodebuild -project FFRemoteLab.xcodeproj \
+            -scheme FFRemoteLab -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
