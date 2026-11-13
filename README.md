@@ -23,3 +23,7 @@ Apri **Actions > Build Android Debug APK**. Dopo una build riuscita, scarica l'a
 6. Revoca dal telefono con **REVOCA** o disattiva Debug wireless.
 
 Il debug wireless è una funzione di Android e il suo abbinamento non può essere reso universale per tutti i telefoni. Usalo soltanto su dispositivi di proprietà o con consenso esplicito.
+
+## Compatibilita' multipiattaforma
+
+ADB gira su host Windows, macOS e Linux, ma si collega soltanto a dispositivi Android. Per il progetto di una futura interfaccia unificata Android + iPhone e per i limiti di iOS, vedi [compatibilita' Android/iOS](docs/COMPATIBILITA_ANDROID_IOS.md). **La versione iOS non e' ancora implementata.**
