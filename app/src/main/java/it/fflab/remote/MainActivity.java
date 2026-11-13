@@ -15,7 +15,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.Process;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Base64;
@@ -48,10 +47,11 @@ public final class MainActivity extends Activity {
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context ctx, Intent intent) {
-            if (Build.VERSION.SDK_INT >= 34 && getSentFromUid() != Process.SHELL_UID) {
-                writeLog("RIFIUTATO: non proviene dalla shell ADB");
-                return;
-            }
+            // The receiver is already gated by android.permission.DUMP in
+            // registerReceiver(), so ordinary third-party apps cannot send commands.
+            // On some Android versions, "adb shell am broadcast" is delivered
+            // with the system UID rather than the shell UID. Checking only
+            // Process.SHELL_UID incorrectly rejected authorized commands.
             runCommand(intent);
         }
     };
