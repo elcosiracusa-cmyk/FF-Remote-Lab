@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Syntax checks for Python console and auto-screen monitor
         run: |
-          python3 -m py_compile kali/ffremote-desktop.py kali/ffremote-autoscreen.py
+          python3 -m py_compile kali/ffremote-desktop.py kali/ffremote-autoscreen.py kali/remote4-server.py kali/ios-viewer.py
       - name: Validate Android version and explicit visible session controls
         run: |
           grep -q 'ABILITA SESSIONE CONTINUA' app/src/main/java/it/fflab/remote/MainActivity.java
