@@ -1,58 +1,35 @@
 package it.fflab.remote;
 
 import android.app.Activity;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
-import android.media.AudioManager;
-import android.media.ToneGenerator;
-import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.VibrationEffect;
-import android.os.Vibrator;
-import android.util.Base64;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
-import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.util.ArrayDeque;
-import java.util.Date;
-import java.util.Locale;
 
-/** Demonstration app with visible, owner-activated commands through paired ADB shell only. */
+/** Simple owner-visible screen for starting and revoking a foreground session. */
 public final class MainActivity extends Activity {
-    private static final String ACTION = "it.fflab.remote.COMMAND";
-    private static final String SENDER_PERMISSION = "android.permission.DUMP";
     private static final int BG = Color.rgb(13, 19, 30);
     private static final int SURFACE = Color.rgb(26, 38, 53);
     private static final int ACCENT = Color.rgb(255, 161, 67);
     private static final int MUTED = Color.rgb(188, 204, 219);
-    private final ArrayDeque<String> history = new ArrayDeque<>();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView status, output, log;
     private Button start, stop;
-    private boolean active = false;
-    private boolean registered = false;
-
-    private final BroadcastReceiver receiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context ctx, Intent intent) {
-            // The receiver is already gated by android.permission.DUMP in
-            // registerReceiver(), so ordinary third-party apps cannot send commands.
-            // On some Android versions, "adb shell am broadcast" is delivered
-            // with the system UID rather than the shell UID. Checking only
-            // Process.SHELL_UID incorrectly rejected authorized commands.
-            runCommand(intent);
+    private final Runnable refresh = new Runnable() {
+        @Override public void run() {
+            showState();
+            handler.postDelayed(this, 700);
         }
     };
 
@@ -61,18 +38,23 @@ public final class MainActivity extends Activity {
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
         buildScreen();
-        writeLog("Avviata: abilita i comandi sul telefono");
+        // Android 13+ requires runtime permission for drawer notifications.
+        // The foreground-service indicator remains visible in Task Manager.
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                   != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 71);
+        }
     }
 
-    @Override protected void onStop() {
-        disable("Sessione terminata: app non visibile");
-        super.onStop();
+    @Override protected void onResume() {
+        super.onResume();
+        handler.post(refresh);
     }
 
-    @Override protected void onDestroy() {
-        disable("Sessione chiusa");
-        handler.removeCallbacksAndMessages(null);
-        super.onDestroy();
+    @Override protected void onPause() {
+        handler.removeCallbacks(refresh);
+        super.onPause();
     }
 
     private void buildScreen() {
@@ -83,7 +65,7 @@ public final class MainActivity extends Activity {
         root.setPadding(dp(20), dp(24), dp(20), dp(28));
         scroll.addView(root);
         root.addView(text("FF REMOTE LAB", 26, ACCENT, true));
-        root.addView(text("Versione 2.0 • Kali Linux / Android Wi-Fi", 14, MUTED, false));
+        root.addView(text("Versione 3.0 - Kali Linux / Android Wi-Fi", 14, MUTED, false));
 
         LinearLayout card = card();
         root.addView(card, spaced(22));
@@ -91,12 +73,12 @@ public final class MainActivity extends Activity {
         status = text("DISATTIVATA", 20, Color.WHITE, true);
         card.addView(status, spaced(12));
         card.addView(text("Il PC deve essere gia' associato tramite Android Debug wireless.", 14, MUTED, false));
-        start = button("ABILITA COMANDI", ACCENT, BG);
+        start = button("ABILITA SESSIONE CONTINUA", ACCENT, BG);
         card.addView(start, spaced(14));
         stop = button("REVOCA SUBITO", SURFACE, Color.WHITE);
         card.addView(stop, spaced(8));
         start.setOnClickListener(v -> enable());
-        stop.setOnClickListener(v -> disable("Revocato sul telefono"));
+        stop.setOnClickListener(v -> disable());
 
         LinearLayout response = card();
         root.addView(response, spaced(18));
@@ -104,119 +86,53 @@ public final class MainActivity extends Activity {
         output = text("Nessun comando", 17, Color.WHITE, false);
         response.addView(output, spaced(9));
 
-        LinearLayout logCard = card();
-        root.addView(logCard, spaced(18));
-        logCard.addView(text("REGISTRO VISIBILE", 13, ACCENT, true));
+        LinearLayout history = card();
+        root.addView(history, spaced(18));
+        history.addView(text("REGISTRO VISIBILE", 13, ACCENT, true));
         log = text("", 13, MUTED, false);
-        logCard.addView(log, spaced(10));
+        history.addView(log, spaced(10));
 
         root.addView(text(
-            "Nessuna funzione nascosta, nessun accesso a SMS, foto, file o microfono. " +
-            "Uscire dall'app interrompe la sessione. Per revocare il PC: " +
-            "Android > Debug wireless > Dispositivi associati.",
+            "Una notifica persistente indica quando la sessione e' attiva. " +
+            "Uscire da questa schermata non revoca i comandi. Tocca REVOCA " +
+            "o INTERROMPI nella notifica per terminare. Il servizio NON attiva " +
+            "da solo Debug wireless e non aggira le autorizzazioni Android.",
             13, MUTED, false), spaced(16));
         setContentView(scroll);
         showState();
     }
 
     private void enable() {
-        if (active) return;
         try {
-            IntentFilter filter = new IntentFilter(ACTION);
-            if (Build.VERSION.SDK_INT >= 33) {
-                registerReceiver(receiver, filter, SENDER_PERMISSION, null, Context.RECEIVER_EXPORTED);
-            } else {
-                registerReceiver(receiver, filter, SENDER_PERMISSION, null);
-            }
-            registered = true;
-            active = true;
-            output.setText("Comandi abilitati finche' l'app rimane visibile");
-            writeLog("Sessione avviata dal telefono");
-        } catch (SecurityException e) {
-            output.setText("Impossibile abilitare il ricevitore protetto");
-            writeLog("Errore autorizzazione");
+            Intent service = new Intent(this, RemoteSessionService.class);
+            service.setAction(RemoteSessionService.ACTION_START);
+            if (Build.VERSION.SDK_INT >= 26) startForegroundService(service);
+            else startService(service);
+            output.setText("Avvio servizio richiesto");
+        } catch (RuntimeException ex) {
+            output.setText("Avvio non riuscito: " + ex.getClass().getSimpleName());
         }
         showState();
     }
 
-    private void disable(String why) {
-        if (registered) {
-            try { unregisterReceiver(receiver); }
-            catch (IllegalArgumentException ignored) { }
-            registered = false;
-        }
-        if (active) writeLog(why);
-        active = false;
-        if (output != null) output.setText("Sessione disattivata");
+    private void disable() {
+        // stopService destroys receiver and clears active state, even in background.
+        stopService(new Intent(this, RemoteSessionService.class));
+        getSharedPreferences(RemoteSessionService.PREFS, MODE_PRIVATE)
+            .edit().putBoolean(RemoteSessionService.KEY_ACTIVE, false).apply();
+        output.setText("Sessione revocata");
         showState();
     }
 
     private void showState() {
         if (status == null) return;
-        status.setText(active ? "ATTIVA / VISIBILE" : "DISATTIVATA");
+        SharedPreferences prefs = getSharedPreferences(RemoteSessionService.PREFS, MODE_PRIVATE);
+        boolean active = RemoteSessionService.isActive(this);
+        status.setText(active ? "ATTIVA / IN BACKGROUND" : "DISATTIVATA");
         start.setEnabled(!active);
         stop.setEnabled(active);
-    }
-
-    private void runCommand(Intent intent) {
-        if (!active || intent == null || !ACTION.equals(intent.getAction())) return;
-        String command = intent.getStringExtra("ff.command");
-        if (command == null) return;
-        command = command.trim().toUpperCase(Locale.ROOT);
-        switch (command) {
-            case "PING":
-                output.setText("PONG — Kali collegato");
-                break;
-            case "MESSAGE":
-                try {
-                    String encoded = intent.getStringExtra("ff.text64");
-                    if (encoded == null || encoded.length() > 1000) return;
-                    String msg = new String(Base64.decode(encoded, Base64.DEFAULT),
-                                            StandardCharsets.UTF_8).trim();
-                    if (msg.isEmpty()) return;
-                    output.setText(msg.substring(0, Math.min(120, msg.length())));
-                } catch (IllegalArgumentException ex) {
-                    writeLog("MESSAGE non valido"); return;
-                }
-                break;
-            case "VIBRATE":
-                Vibrator vib = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-                if (vib != null && vib.hasVibrator()) {
-                    vib.vibrate(VibrationEffect.createOneShot(250, VibrationEffect.DEFAULT_AMPLITUDE));
-                }
-                output.setText("Vibrazione richiesta");
-                break;
-            case "BEEP":
-                ToneGenerator tone = new ToneGenerator(AudioManager.STREAM_MUSIC, 80);
-                tone.startTone(ToneGenerator.TONE_PROP_BEEP, 250);
-                handler.postDelayed(tone::release, 350);
-                output.setText("Segnale audio eseguito");
-                break;
-            case "STATUS":
-                BatteryManager battery = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
-                int pct = battery == null ? -1 :
-                    battery.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
-                output.setText(Build.MANUFACTURER + " " + Build.MODEL +
-                    "\nAndroid " + Build.VERSION.RELEASE +
-                    "\nBatteria " + (pct >= 0 ? pct + "%" : "n/d"));
-                break;
-            case "STOP":
-                disable("Arresto richiesto da Kali"); return;
-            default:
-                writeLog("Comando non riconosciuto"); return;
-        }
-        writeLog("ESEGUITO " + command);
-    }
-
-    private void writeLog(String message) {
-        String time = new SimpleDateFormat("HH:mm:ss", Locale.ITALY).format(new Date());
-        history.addFirst(time + " — " + message);
-        while (history.size() > 12) history.removeLast();
-        if (log != null) {
-            StringBuilder s = new StringBuilder();
-            for (String entry : history) s.append(entry).append('\n');
-            log.setText(s.toString());
-        }
+        output.setText(prefs.getString(RemoteSessionService.KEY_OUTPUT, "Nessun comando"));
+        log.setText(prefs.getString(RemoteSessionService.KEY_HISTORY, ""));
     }
 
     private LinearLayout card() {
@@ -259,5 +175,7 @@ public final class MainActivity extends Activity {
         return p;
     }
 
-    private int dp(int v) { return (int)(v * getResources().getDisplayMetrics().density + 0.5f); }
+    private int dp(int v) {
+        return (int)(v * getResources().getDisplayMetrics().density + 0.5f);
+    }
 }
