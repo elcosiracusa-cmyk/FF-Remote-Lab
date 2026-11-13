@@ -1,29 +1,47 @@
-# FF Remote Lab 2.0
+# FF Remote Lab 3.0
 
-Applicazione Android di laboratorio per controlli **visibili, limitati e autorizzati** tramite Android Debug Bridge (ADB) Wi-Fi, da Kali Linux.
+Laboratorio di supporto remoto **autorizzato, visibile e revocabile**. Include Android funzionante tramite ADB, lancio automatico dello schermo via scrcpy per Kali e un **prototipo iOS non ancora completo**.
 
-- Prima associazione ADB confermata dal proprietario su ogni telefono.
-- Nessuna password universale o controllo nascosto.
-- Sessione attivabile sul telefono; si interrompe se l'app esce dal primo piano.
-- Comandi: `ping`, `message`, `vibrate`, `beep`, `status`, `stop`.
-- Il controllo dello schermo completo richiede `scrcpy` (strumento esterno).
-- Nessun accesso a messaggi, microfono, contatti, foto, file privati o Internet.
+## Android 3.0: sessione persistente
 
-## Ottenere l'APK
+- Il proprietario apre l'app e tocca **ABILITA SESSIONE CONTINUA**.
+- Un **foreground service Android** mantiene attivo il ricevitore dei comandi quando l'interfaccia viene lasciata.
+- **La notifica persistente mostra la sessione e include INTERROMPI**; nell'app resta il pulsante REVOCA SUBITO.
+- Comandi da ADB autorizzato: `ping`, `message`, `vibrate`, `beep`, `status`, `stop`.
+- I broadcast sono protetti dal permesso privilegiato `android.permission.DUMP`.
+- Non si attiva il Debug wireless autonomamente, non si aggira la conferma ADB, non si avvia automaticamente dopo la prima installazione. Android puo' interrompere il servizio in condizioni di risparmio energetico o arresto forzato.
+- Nessun accesso a messaggi privati, file, fotocamera, microfono o dati nascosti.
 
-Apri **Actions > Build Android Debug APK**. Dopo una build riuscita, scarica l'artifact **FFRemoteLab-2-debug-apk**. L'APK `app-debug.apk` è firmato con una chiave di debug Android: adatto ai test, non alla distribuzione Play Store.
+## APK Android
 
-## Installazione via Kali
+Apri **Actions > Build Android Debug APK** e scarica `FFRemoteLab-3-debug-apk` dall'ultima build verde. Estrai `app-debug.apk`, firmato con chiave debug. Non e' una versione Play Store.
 
-1. Associa Android a Kali una volta sola: *Impostazioni > Opzioni sviluppatore > Debug wireless > Associa dispositivo*.
-2. Da Kali: `adb pair IP:PORTA_ASSOCIAZIONE`, poi `adb connect IP:PORTA_CONNESSIONE`.
-3. Installa l'APK: `adb install -r app-debug.apk`.
-4. Apri **FF Remote Lab** sul telefono e premi **ABILITA COMANDI**.
-5. Sul PC: `bash kali/ffremote.sh ping`, oppure `bash kali/ffremote.sh message "Ciao da Kali"`.
-6. Revoca dal telefono con **REVOCA** o disattiva Debug wireless.
+Su Pixel: apri l'app e conferma la richiesta di notifiche, quindi tocca **ABILITA SESSIONE CONTINUA**. Potrai chiudere la schermata dell'app continuando a ricevere i comandi tramite ADB finche' il servizio rimane attivo.
 
-Il debug wireless è una funzione di Android e il suo abbinamento non può essere reso universale per tutti i telefoni. Usalo soltanto su dispositivi di proprietà o con consenso esplicito.
+## Kali Linux: apertura automatica dello schermo
 
-## Compatibilita' multipiattaforma
+Requisiti: adb, scrcpy, python3, connessione grafica e telefono gia' autorizzato in Debug wireless.
 
-ADB gira su host Windows, macOS e Linux, ma si collega soltanto a dispositivi Android. Per il progetto di una futura interfaccia unificata Android + iPhone e per i limiti di iOS, vedi [compatibilita' Android/iOS](docs/COMPATIBILITA_ANDROID_IOS.md). **La versione iOS non e' ancora implementata.**
+Dalla cartella del repository:
+
+```bash
+bash kali/install-autoscreen.sh
+$HOME/.local/bin/ffremote-autoscreen allow 192.168.1.31
+$HOME/.local/bin/ffremote-autoscreen watch
+```
+
+Al successivo accesso grafico a Kali, il monitor parte automaticamente. Quando ADB rileva il dispositivo consentito, lancia `scrcpy -s SERIALE -m 1024`. Se il telefono non e' gia' connesso via ADB, occorre usare `adb connect IP:PORTA_ATTUALE` (la porta puo' cambiare). Si puo' revocare l'apertura automatica:
+
+```bash
+$HOME/.local/bin/ffremote-autoscreen forget 192.168.1.31
+```
+
+Lo script non avvia scrcpy su telefoni non esplicitamente aggiunti all'elenco e non tenta l'abbinamento senza consenso.
+
+## iPhone (prototipo)
+
+In `ios/` sono presenti un progetto XcodeGen SwiftUI, una schermata ReplayKit e un'estensione che riceve campioni video **senza trasmetterli**. Attualmente **non** esiste un IPA installabile, ne' un ricevitore su Kali. Non e' ancora possibile vedere lo schermo di iPhone su Kali con questo progetto.
+
+Su iOS la condivisione schermo richiede una scelta esplicita dell'utente tramite l'interfaccia di sistema. Un'app iOS ordinaria non puo' controllare via ADB il touch o altre app.
+
+Vedi [dettagli iOS](ios/README.md) e [compatibilita' Android/iOS](docs/COMPATIBILITA_ANDROID_IOS.md).
