@@ -16,6 +16,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.EditText;
 
 /** Simple owner-visible screen for starting and revoking a foreground session. */
 public final class MainActivity extends Activity {
@@ -26,6 +27,7 @@ public final class MainActivity extends Activity {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private TextView status, output, log;
     private Button start, stop;
+    private EditText remoteUrl, remoteToken;
     private final Runnable refresh = new Runnable() {
         @Override public void run() {
             showState();
@@ -65,7 +67,7 @@ public final class MainActivity extends Activity {
         root.setPadding(dp(20), dp(24), dp(20), dp(28));
         scroll.addView(root);
         root.addView(text("FF REMOTE LAB", 26, ACCENT, true));
-        root.addView(text("Versione 3.0 - Kali Linux / Android Wi-Fi", 14, MUTED, false));
+        root.addView(text("Versione 4.0 - Wi-Fi / 4G / 5G", 14, MUTED, false));
 
         LinearLayout card = card();
         root.addView(card, spaced(22));
@@ -73,6 +75,40 @@ public final class MainActivity extends Activity {
         status = text("DISATTIVATA", 20, Color.WHITE, true);
         card.addView(status, spaced(12));
         card.addView(text("Il PC deve essere gia' associato tramite Android Debug wireless.", 14, MUTED, false));
+        root.addView(text("CONNESSIONE INTERNET PRIVATA (FACOLTATIVA)", 14, ACCENT, true), spaced(18));
+        root.addView(text("Configura l'URL HTTPS di Tailscale Serve e il token riservato ad Android. Il token resta sul telefono; non mostrarlo ad altri.", 13, MUTED, false), spaced(8));
+        remoteUrl = new EditText(this);
+        remoteUrl.setSingleLine(true);
+        remoteUrl.setHint("https://nome.tailnet.ts.net/");
+        remoteUrl.setText(RemoteInternetClient.savedUrl(this));
+        remoteUrl.setTextColor(Color.WHITE);
+        remoteUrl.setHintTextColor(MUTED);
+        root.addView(remoteUrl, spaced(8));
+        remoteToken = new EditText(this);
+        remoteToken.setSingleLine(true);
+        remoteToken.setHint("Token Android (da server Kali)");
+        remoteToken.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        remoteToken.setTextColor(Color.WHITE);
+        remoteToken.setHintTextColor(MUTED);
+        root.addView(remoteToken, spaced(8));
+        Button save = button("SALVA CONNESSIONE HTTPS", SURFACE, Color.WHITE);
+        root.addView(save, spaced(8));
+        save.setOnClickListener(v -> {
+            try {
+                String url = remoteUrl.getText().toString().trim();
+                String token = remoteToken.getText().toString().trim();
+                RemoteInternetClient.save(this, url, token);
+                remoteToken.setText("");
+                android.widget.Toast.makeText(this,
+                    "Connessione memorizzata. Attiva la sessione per collegarti.",
+                    android.widget.Toast.LENGTH_LONG).show();
+            } catch (IllegalArgumentException ex) {
+                android.widget.Toast.makeText(this, ex.getMessage(),
+                    android.widget.Toast.LENGTH_LONG).show();
+            }
+        });
+
         start = button("ABILITA SESSIONE CONTINUA", ACCENT, BG);
         card.addView(start, spaced(14));
         stop = button("REVOCA SUBITO", SURFACE, Color.WHITE);
