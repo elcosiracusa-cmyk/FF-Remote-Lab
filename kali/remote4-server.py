@@ -136,6 +136,17 @@ class Handler(BaseHTTPRequestHandler):
                 return
             with lock:
                 frame = latest_frame
+                frame_when = latest_frame_time
+            # A disconnected or revoked broadcast must not leave a stale
+            # picture frozen on the observer screen.
+            if frame_when is not None:
+                try:
+                    age = (datetime.now(timezone.utc)
+                           - datetime.fromisoformat(frame_when)).total_seconds()
+                    if age > 8:
+                        frame = None
+                except ValueError:
+                    frame = None
             if frame is None:
                 self.send_data(404, {"error": "Nessun frame disponibile"})
                 return
