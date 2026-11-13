@@ -45,3 +45,22 @@ In `ios/` sono presenti un progetto XcodeGen SwiftUI, una schermata ReplayKit e 
 Su iOS la condivisione schermo richiede una scelta esplicita dell'utente tramite l'interfaccia di sistema. Un'app iOS ordinaria non puo' controllare via ADB il touch o altre app.
 
 Vedi [dettagli iOS](ios/README.md) e [compatibilita' Android/iOS](docs/COMPATIBILITA_ANDROID_IOS.md).
+
+## FF Remote Lab 4.0 - console desktop locale (anteprima)
+
+E' disponibile `kali/ffremote-desktop.py`, una **console grafica locale** per gestire dispositivi Android abbinati e autorizzati via ADB. I pulsanti disponibili sono: aggiorna telefoni, connetti IP:PORTA, apri schermo via scrcpy dopo conferma, PING, STATUS, VIBRATE, BEEP, MESSAGE e STOP. Il registro locale indica quando vengono richiesti i comandi.
+
+Su Kali Linux:
+
+```bash
+sudo apt install adb scrcpy python3-tk
+git clone https://github.com/elcosiracusa-cmyk/FF-Remote-Lab.git
+cd FF-Remote-Lab
+python3 kali/ffremote-desktop.py
+```
+
+**Sicurezza e trasparenza**: la console non crea un'app invisibile, non nasconde indicatori Android, non disabilita le revoche e non elude le richieste di autorizzazione. La sessione Android continua a usare il servizio in primo piano della versione 3.0 e richiede l'abilitazione sul telefono. Il collegamento Wi-Fi funziona solo con ADB raggiungibile; il controllo via 4G/5G e una infrastruttura cifrata esterna non sono ancora implementati.
+
+**iPhone**: nessuna app iOS completa; e' disponibile solo il prototipo SwiftUI/ReplayKit in `ios/`, e la duplicazione volontaria tramite AirPlay/UxPlay. ADB non supporta iPhone, ne' puo' controllare il touch iOS.
+
+La dicitura **4.0** identifica per ora la console desktop sperimentale, non una nuova APK Android completa o un sistema di gestione remota via Internet.
