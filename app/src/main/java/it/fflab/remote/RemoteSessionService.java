@@ -49,6 +49,7 @@ public final class RemoteSessionService extends Service {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean receiverRegistered;
     private boolean sessionStarted;
+    private RemoteInternetClient internetClient;
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -104,6 +105,17 @@ public final class RemoteSessionService extends Service {
                 sessionStarted = true;
                 getSharedPreferences(PREFS, MODE_PRIVATE).edit()
                     .putBoolean(KEY_ACTIVE, true).apply();
+                internetClient = new RemoteInternetClient(this, (kind, msg) -> {
+                    Intent remoteIntent = new Intent(ACTION_COMMAND);
+                    remoteIntent.putExtra("ff.command", kind);
+                    if ("MESSAGE".equals(kind)) {
+                        remoteIntent.putExtra("ff.text64", android.util.Base64.encodeToString(
+                            msg.getBytes(StandardCharsets.UTF_8), android.util.Base64.NO_WRAP));
+                    }
+                    executeCommand(remoteIntent);
+                    return "Ricevuto " + kind;
+                });
+                internetClient.start();
                 record("Sessione attiva con notifica visibile",
                        "Pronto: comandi ADB abilitati anche fuori dall'app");
             } catch (RuntimeException ex) {
@@ -228,6 +240,7 @@ public final class RemoteSessionService extends Service {
             receiverRegistered = false;
         }
         sessionStarted = false;
+        if (internetClient != null) internetClient.stop();
         getSharedPreferences(PREFS, MODE_PRIVATE).edit()
             .putBoolean(KEY_ACTIVE, false).apply();
         handler.removeCallbacksAndMessages(null);
