@@ -33,5 +33,5 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: it.fflab.remoteios.broadcast
         CODE_SIGN_ENTITLEMENTS: FFBroadcastExtension/FFBroadcastExtension.entitlements
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.broadcast-services
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.broadcast-services-upload
         INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SampleHandler"
